@@ -41,3 +41,27 @@ function testDateUtils() {
   Logger.log('Yesterday: ' + daysAgo(1));
   Logger.log('7 days ago: ' + daysAgo(7));
 }
+
+function testApiResponse() {
+  var token = PropertiesService.getScriptProperties().getProperty('LW_API_TOKEN');
+  var payload = JSON.stringify({
+    from: daysAgo(2),
+    to: daysAgo(2),
+    aggregateTime: false,
+    aggregateAdUnits: false,
+    aggregateSites: false,
+    aggregatePublishers: false,
+    includeSoldStatistics: true
+  });
+  var options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'Authorization': 'Bearer ' + token },
+    payload: payload,
+    muteHttpExceptions: true
+  };
+  var response = UrlFetchApp.fetch(LW_API_URL, options);
+  Logger.log('HTTP status: ' + response.getResponseCode());
+  var text = response.getContentText();
+  Logger.log('Response (first 3000 chars): ' + text.slice(0, 3000));
+}
