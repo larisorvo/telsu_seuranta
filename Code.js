@@ -1,7 +1,8 @@
 var SPREADSHEET_ID = '1YqwtZsGymSMcp2wJrW_yNJZW1xdnSFwzzB1TtMqC1vI';
 var LW_API_URL = 'https://api.livewrapped.com/Statistics';
 var LW_INVENTORY_URL = 'https://api.livewrapped.com/StatsInventory';
-var LW_PUBLISHER_ID = 'ac8a0bef-d0d0-459f-a991-a21630b91dee';
+var LW_PUBLISHER_ID = '10a9e92d-bdc4-45b1-8369-abe8dc375c10'; // Mindmax testi publisher ID
+var LW_SITE_ID = '0a4ad0dc-e271-4137-97f3-6eddc3b2ab33'; // telsu.fi site ID
 var PUBLISHER_NAME = 'Mindmax testi';
 var LW_SHEET_NAME = 'LW';
 var HEADERS = [
@@ -42,8 +43,9 @@ function lwAuthHeaders() {
 }
 
 function lwGetSiteNameMap() {
+  // Fetch all sites accessible to this token (no publisher filter)
   var resp = withRetry(function() {
-    return UrlFetchApp.fetch(LW_INVENTORY_URL + '/publisher/' + LW_PUBLISHER_ID + '/site', {
+    return UrlFetchApp.fetch(LW_INVENTORY_URL + '/publisher/site', {
       method: 'get',
       headers: lwAuthHeaders(),
       muteHttpExceptions: true
@@ -88,7 +90,7 @@ function fetchDayStats(date, siteNames, adUnitNames) {
     from: date,
     to: date,
     aggregationLevel: 2,
-    publisherIds: [LW_PUBLISHER_ID],
+    siteIds: [LW_SITE_ID],
     aggregateTime: false,
     aggregateAdUnits: false,
     aggregateSites: false,
@@ -196,7 +198,7 @@ function refreshData() {
   var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(LW_SHEET_NAME);
   if (!sheet) throw new Error('Sheet "' + LW_SHEET_NAME + '" not found.');
   var siteNames = lwGetSiteNameMap();
-  var adUnitNames = lwGetAdUnitNameMap(Object.keys(siteNames));
+  var adUnitNames = lwGetAdUnitNameMap([LW_SITE_ID]);
   for (var i = 1; i <= 3; i++) {
     var rows = fetchDayStats(daysAgo(i), siteNames, adUnitNames);
     upsertRows(sheet, rows);
@@ -207,7 +209,7 @@ function initialLoad() {
   var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(LW_SHEET_NAME);
   if (!sheet) throw new Error('Sheet "' + LW_SHEET_NAME + '" not found.');
   var siteNames = lwGetSiteNameMap();
-  var adUnitNames = lwGetAdUnitNameMap(Object.keys(siteNames));
+  var adUnitNames = lwGetAdUnitNameMap([LW_SITE_ID]);
   for (var i = 1; i <= 7; i++) {
     var rows = fetchDayStats(daysAgo(i), siteNames, adUnitNames);
     upsertRows(sheet, rows);
@@ -239,11 +241,63 @@ function onOpen() {
     .addToUi();
 }
 
+function testRawStatFields() {
+  var date = daysAgo(1);
+  var payload = JSON.stringify({
+    from: date, to: date,
+    aggregationLevel: 2,
+    publisherIds: [LW_PUBLISHER_ID],
+    siteIds: [LW_SITE_ID],
+    aggregateTime: false,
+    aggregateAdUnits: false,
+    aggregateSites: false,
+    aggregatePublishers: false,
+    aggregateBuyers: true,
+    aggregateAdvertiserNames: true,
+    aggregateAdvertiserDomains: true,
+    aggregateDeals: true,
+    aggregateResellers: true,
+    aggregateLivewrappedDeals: true,
+    aggregateAgencies: true,
+    aggregateSeats: true,
+    aggregateBrowser: true,
+    aggregateCookieSupport: true,
+    includeSubSetPublishers: true,
+    avoidClientAggregation: true,
+    includeBidLevels: false,
+    includeNoBidResponses: false,
+    includeErrors: false,
+    includeResponseTimes: false,
+    includeFormats: false,
+    includeUserStatistics: 0,
+    includeSoldStatistics: false,
+    includeDealStatistics: false,
+    includeAvails: true
+  });
+  var resp = UrlFetchApp.fetch(LW_API_URL, {
+    method: 'post', headers: lwAuthHeaders(),
+    payload: payload, muteHttpExceptions: true
+  });
+  Logger.log('Status: ' + resp.getResponseCode());
+  var data = JSON.parse(resp.getContentText());
+  Logger.log('Rows: ' + (data.stats ? data.stats.length : 0));
+  if (data.stats && data.stats.length > 0) {
+    var first = data.stats[0];
+    Logger.log('adUnitId: ' + first.adUnitId);
+    Logger.log('request: ' + JSON.stringify(first.request));
+    Logger.log('response.soldImpressions: ' + first.response.soldImpressions);
+    Logger.log('response.netRevenue: ' + JSON.stringify(first.response.netRevenue));
+    Logger.log('response.percentageInView: ' + first.response.percentageInView);
+    Logger.log('response.views: ' + first.response.views);
+  }
+}
+
 function testFetchDayStats() {
-  var date = daysAgo(2);
+  var date = daysAgo(1);
   Logger.log('Fetching for: ' + date);
   var siteNames = lwGetSiteNameMap();
-  var adUnitNames = lwGetAdUnitNameMap(Object.keys(siteNames));
+  var adUnitNames = lwGetAdUnitNameMap([LW_SITE_ID]);
+  Logger.log('Ad units for telsu.fi: ' + Object.keys(adUnitNames).length);
   var rows = fetchDayStats(date, siteNames, adUnitNames);
   Logger.log('Rows returned: ' + rows.length);
   if (rows.length > 0) {
