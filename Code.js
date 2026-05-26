@@ -1,4 +1,4 @@
-var SPREADSHEET_ID = ''; // Fill in after Task 2
+var SPREADSHEET_ID = '1YqwtZsGymSMcp2wJrW_yNJZW1xdnSFwzzB1TtMqC1vI';
 var LW_API_URL = 'https://api.livewrapped.com/Statistics';
 var PUBLISHER_FILTER = 'Mindmax testi';
 var LW_SHEET_NAME = 'LW';
