@@ -44,24 +44,36 @@ function testDateUtils() {
 
 function testApiResponse() {
   var token = PropertiesService.getScriptProperties().getProperty('LW_API_TOKEN');
-  var payload = JSON.stringify({
-    from: daysAgo(2),
-    to: daysAgo(2),
-    aggregateTime: false,
-    aggregateAdUnits: false,
-    aggregateSites: false,
-    aggregatePublishers: false,
-    includeSoldStatistics: true
-  });
-  var options = {
-    method: 'post',
-    contentType: 'application/json',
-    headers: { 'Authorization': 'Bearer ' + token },
-    payload: payload,
-    muteHttpExceptions: true
-  };
-  var response = UrlFetchApp.fetch(LW_API_URL, options);
-  Logger.log('HTTP status: ' + response.getResponseCode());
-  var text = response.getContentText();
-  Logger.log('Response (first 3000 chars): ' + text.slice(0, 3000));
+  Logger.log('Token first 20 chars: ' + (token ? token.slice(0, 20) : 'MISSING'));
+
+  var payload = JSON.stringify({ from: daysAgo(2), to: daysAgo(2) });
+  var authFormats = [
+    'Bearer ' + token,
+    'ApiKey ' + token,
+    token
+  ];
+  var urls = [
+    'https://api.livewrapped.com/Statistics',
+    'https://api.livewrapped.com/statistics',
+    'https://api.livewrapped.com/api/Statistics'
+  ];
+
+  for (var u = 0; u < urls.length; u++) {
+    for (var a = 0; a < authFormats.length; a++) {
+      var options = {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { 'Authorization': authFormats[a] },
+        payload: payload,
+        muteHttpExceptions: true
+      };
+      var response = UrlFetchApp.fetch(urls[u], options);
+      var status = response.getResponseCode();
+      Logger.log('URL: ' + urls[u] + ' | Auth: ' + authFormats[a].slice(0, 15) + '... | Status: ' + status);
+      if (status !== 500 && status !== 404) {
+        Logger.log('Promising response: ' + response.getContentText().slice(0, 500));
+      }
+      Utilities.sleep(500);
+    }
+  }
 }
