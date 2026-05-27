@@ -1,7 +1,6 @@
 var SPREADSHEET_ID = '1YqwtZsGymSMcp2wJrW_yNJZW1xdnSFwzzB1TtMqC1vI';
 var LW_API_URL = 'https://api.livewrapped.com/Statistics';
 var LW_INVENTORY_URL = 'https://api.livewrapped.com/StatsInventory';
-var LW_PUBLISHER_ID = '10a9e92d-bdc4-45b1-8369-abe8dc375c10'; // Mindmax testi publisher ID
 var LW_SITE_ID = '3874b663-6c91-4c50-8dc6-b8b1063511b6'; // telsu.fi site ID
 var PUBLISHER_NAME = 'Mindmax testi';
 var LW_SHEET_NAME = 'LW';
@@ -46,7 +45,6 @@ function lwAuthHeaders() {
 }
 
 function lwGetSiteNameMap() {
-  // Fetch all sites accessible to this token (no publisher filter)
   var resp = withRetry(function() {
     return UrlFetchApp.fetch(LW_INVENTORY_URL + '/publisher/site', {
       method: 'get',
@@ -158,45 +156,6 @@ function fetchDayStats(date, siteNames, adUnitNames) {
   return rows;
 }
 
-function upsertRows(sheet, rows) {
-  if (!rows || rows.length === 0) return;
-
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1, 1, 1, NUM_COLS).setValues([HEADERS]);
-  }
-
-  var lastRow = sheet.getLastRow();
-  var dataRows = Math.max(0, lastRow - 1);
-  var index = {};
-
-  if (dataRows > 0) {
-    var existing = sheet.getRange(2, 1, dataRows, NUM_COLS).getValues();
-    for (var i = 0; i < existing.length; i++) {
-      var dateVal = existing[i][0];
-      var dateStr = (dateVal instanceof Date)
-        ? Utilities.formatDate(dateVal, 'Europe/Helsinki', 'yyyy-MM-dd')
-        : String(dateVal).slice(0, 10);
-      var key = dateStr + '|' + existing[i][3] + '|' + existing[i][4];
-      index[key] = i + 2;
-    }
-  }
-
-  var toAppend = [];
-  for (var j = 0; j < rows.length; j++) {
-    var r = rows[j];
-    var key = r[0] + '|' + r[3] + '|' + r[4];
-    if (index[key]) {
-      sheet.getRange(index[key], 1, 1, NUM_COLS).setValues([r]);
-    } else {
-      toAppend.push(r);
-    }
-  }
-
-  if (toAppend.length > 0) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, NUM_COLS).setValues(toAppend);
-  }
-}
-
 function parseGamCsv(csvText) {
   var lines = csvText.split('\n');
   var date = null;
@@ -240,13 +199,51 @@ function parseGamCsv(csvText) {
   return rows;
 }
 
+function upsertRows(sheet, rows) {
+  if (!rows || rows.length === 0) return;
+
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, NUM_COLS).setValues([HEADERS]);
+  }
+
+  var lastRow = sheet.getLastRow();
+  var dataRows = Math.max(0, lastRow - 1);
+  var index = {};
+
+  if (dataRows > 0) {
+    var existing = sheet.getRange(2, 1, dataRows, NUM_COLS).getValues();
+    for (var i = 0; i < existing.length; i++) {
+      var dateVal = existing[i][0];
+      var dateStr = (dateVal instanceof Date)
+        ? Utilities.formatDate(dateVal, 'Europe/Helsinki', 'yyyy-MM-dd')
+        : String(dateVal).slice(0, 10);
+      var key = dateStr + '|' + existing[i][3] + '|' + existing[i][4];
+      index[key] = i + 2;
+    }
+  }
+
+  var toAppend = [];
+  for (var j = 0; j < rows.length; j++) {
+    var r = rows[j];
+    var key = r[0] + '|' + r[3] + '|' + r[4];
+    if (index[key]) {
+      sheet.getRange(index[key], 1, 1, NUM_COLS).setValues([r]);
+    } else {
+      toAppend.push(r);
+    }
+  }
+
+  if (toAppend.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, NUM_COLS).setValues(toAppend);
+  }
+}
+
 function refreshGamData() {
   var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(GAM_SHEET_NAME);
   if (!sheet) throw new Error('Sheet "' + GAM_SHEET_NAME + '" not found.');
 
   var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
   var threads = GmailApp.search(query);
-  Logger.log('GAM threads found: ' + threads.length);
 
   for (var i = 0; i < threads.length; i++) {
     var messages = threads[i].getMessages();
@@ -256,7 +253,6 @@ function refreshGamData() {
       var att = attachments[j];
       if (att.getName().toLowerCase().indexOf('.csv') !== -1) {
         var rows = parseGamCsv(att.getDataAsString());
-        Logger.log('GAM rows parsed: ' + rows.length + ' from "' + att.getName() + '"');
         upsertRows(sheet, rows);
         break;
       }
@@ -269,10 +265,8 @@ function refreshData() {
   if (!sheet) throw new Error('Sheet "' + LW_SHEET_NAME + '" not found.');
   var siteNames = lwGetSiteNameMap();
   var adUnitNames = lwGetAdUnitNameMap([LW_SITE_ID]);
-  for (var i = 1; i <= 3; i++) {
-    var rows = fetchDayStats(daysAgo(i), siteNames, adUnitNames);
-    upsertRows(sheet, rows);
-  }
+  var rows = fetchDayStats(daysAgo(1), siteNames, adUnitNames);
+  upsertRows(sheet, rows);
   refreshGamData();
 }
 
@@ -305,104 +299,10 @@ function createDailyTrigger() {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Telsu seuranta')
-    .addItem('Refresh last 3 days (LW + GAM)', 'refreshData')
+    .addItem('Refresh yesterday (LW + GAM)', 'refreshData')
     .addItem('Initial load LW (7 days)', 'initialLoad')
     .addItem('Refresh GAM from Gmail', 'refreshGamData')
     .addSeparator()
     .addItem('Create daily trigger (06:00)', 'createDailyTrigger')
     .addToUi();
-}
-
-function testRawStatFields() {
-  var date = daysAgo(1);
-  var payload = JSON.stringify({
-    from: date, to: date,
-    aggregationLevel: 2,
-    publisherIds: [LW_PUBLISHER_ID],
-    siteIds: [LW_SITE_ID],
-    aggregateTime: false,
-    aggregateAdUnits: false,
-    aggregateSites: false,
-    aggregatePublishers: false,
-    aggregateBuyers: true,
-    aggregateAdvertiserNames: true,
-    aggregateAdvertiserDomains: true,
-    aggregateDeals: true,
-    aggregateResellers: true,
-    aggregateLivewrappedDeals: true,
-    aggregateAgencies: true,
-    aggregateSeats: true,
-    aggregateBrowser: true,
-    aggregateCookieSupport: true,
-    includeSubSetPublishers: true,
-    avoidClientAggregation: true,
-    includeBidLevels: false,
-    includeNoBidResponses: false,
-    includeErrors: false,
-    includeResponseTimes: false,
-    includeFormats: false,
-    includeUserStatistics: 0,
-    includeSoldStatistics: false,
-    includeDealStatistics: false,
-    includeAvails: true
-  });
-  var resp = UrlFetchApp.fetch(LW_API_URL, {
-    method: 'post', headers: lwAuthHeaders(),
-    payload: payload, muteHttpExceptions: true
-  });
-  Logger.log('Status: ' + resp.getResponseCode());
-  var data = JSON.parse(resp.getContentText());
-  Logger.log('Rows: ' + (data.stats ? data.stats.length : 0));
-  if (data.stats && data.stats.length > 0) {
-    var first = data.stats[0];
-    Logger.log('adUnitId: ' + first.adUnitId);
-    Logger.log('request: ' + JSON.stringify(first.request));
-    Logger.log('response.soldImpressions: ' + first.response.soldImpressions);
-    Logger.log('response.netRevenue: ' + JSON.stringify(first.response.netRevenue));
-    Logger.log('response.percentageInView: ' + first.response.percentageInView);
-    Logger.log('response.views: ' + first.response.views);
-  }
-}
-
-function testRefreshGamData() {
-  Logger.log('Searching Gmail for GAM reports...');
-  refreshGamData();
-  Logger.log('Done.');
-}
-
-function testParseGamCsv() {
-  var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
-  var threads = GmailApp.search(query);
-  Logger.log('Threads found: ' + threads.length);
-  if (threads.length === 0) return;
-  var msg = threads[0].getMessages()[threads[0].getMessages().length - 1];
-  Logger.log('Subject: ' + msg.getSubject());
-  Logger.log('Date: ' + msg.getDate());
-  var attachments = msg.getAttachments();
-  Logger.log('Attachments: ' + attachments.length);
-  for (var i = 0; i < attachments.length; i++) {
-    Logger.log('  ' + attachments[i].getName() + ' (' + attachments[i].getContentType() + ')');
-  }
-  if (attachments.length > 0) {
-    var rows = parseGamCsv(attachments[0].getDataAsString());
-    Logger.log('Parsed rows: ' + rows.length);
-    if (rows.length > 0) {
-      Logger.log('First: ' + JSON.stringify(rows[0]));
-      Logger.log('Last:  ' + JSON.stringify(rows[rows.length - 1]));
-    }
-  }
-}
-
-function testFetchDayStats() {
-  var date = daysAgo(1);
-  Logger.log('Fetching for: ' + date);
-  var siteNames = lwGetSiteNameMap();
-  var adUnitNames = lwGetAdUnitNameMap([LW_SITE_ID]);
-  Logger.log('Ad units for telsu.fi: ' + Object.keys(adUnitNames).length);
-  var rows = fetchDayStats(date, siteNames, adUnitNames);
-  Logger.log('Rows returned: ' + rows.length);
-  if (rows.length > 0) {
-    Logger.log('First row: ' + JSON.stringify(rows[0]));
-    Logger.log('Last row: ' + JSON.stringify(rows[rows.length - 1]));
-  }
 }
