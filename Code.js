@@ -5,6 +5,9 @@ var LW_PUBLISHER_ID = '10a9e92d-bdc4-45b1-8369-abe8dc375c10'; // Mindmax testi p
 var LW_SITE_ID = '3874b663-6c91-4c50-8dc6-b8b1063511b6'; // telsu.fi site ID
 var PUBLISHER_NAME = 'Mindmax testi';
 var LW_SHEET_NAME = 'LW';
+var GAM_SHEET_NAME = 'Google';
+var GAM_REPORT_SENDER = 'admanager-noreply@google.com';
+var GAM_REPORT_SUBJECT = 'Report: im report';
 var HEADERS = [
   'Date', 'Source', 'Publisher', 'Site', 'Placement',
   'Available Impressions', 'Viewable Impressions',
@@ -194,6 +197,73 @@ function upsertRows(sheet, rows) {
   }
 }
 
+function parseGamCsv(csvText) {
+  var lines = csvText.split('\n');
+  var date = null;
+  var publisher = '';
+  var dataHeaderIdx = -1;
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].replace('\r', '');
+    if (line.indexOf('Date range,') === 0) {
+      var dateStr = line.slice('Date range,'.length).replace(/"/g, '').trim();
+      date = Utilities.formatDate(new Date(dateStr), 'Europe/Helsinki', 'yyyy-MM-dd');
+    }
+    if (line.indexOf('Publisher network,') === 0) {
+      publisher = line.slice('Publisher network,'.length).replace(/"/g, '').trim();
+    }
+    if (line.indexOf('Ad unit (all levels),') === 0) {
+      dataHeaderIdx = i;
+      break;
+    }
+  }
+
+  if (!date || dataHeaderIdx === -1) return [];
+
+  var rows = [];
+  for (var j = dataHeaderIdx + 1; j < lines.length; j++) {
+    var dataLine = lines[j].replace('\r', '').trim();
+    if (!dataLine) continue;
+    var cols = dataLine.split(',');
+    if (cols.length < 6) continue;
+    var placement = cols[0].trim();
+    if (!placement) continue;
+    var site = placement.split(' ')[0].toLowerCase();
+    var avail = parseInt(cols[1], 10) || 0;
+    var sold = parseInt(cols[2], 10) || 0;
+    var revenue = parseFloat(cols[3]) || 0;
+    var inViewPct = parseFloat(cols[5]) || 0;
+    var viewable = Math.round(sold * inViewPct);
+    rows.push([date, 'Google AdX', publisher, site, placement,
+               avail, viewable, sold, revenue, inViewPct]);
+  }
+  return rows;
+}
+
+function refreshGamData() {
+  var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(GAM_SHEET_NAME);
+  if (!sheet) throw new Error('Sheet "' + GAM_SHEET_NAME + '" not found.');
+
+  var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
+  var threads = GmailApp.search(query);
+  Logger.log('GAM threads found: ' + threads.length);
+
+  for (var i = 0; i < threads.length; i++) {
+    var messages = threads[i].getMessages();
+    var msg = messages[messages.length - 1];
+    var attachments = msg.getAttachments();
+    for (var j = 0; j < attachments.length; j++) {
+      var att = attachments[j];
+      if (att.getName().toLowerCase().indexOf('.csv') !== -1) {
+        var rows = parseGamCsv(att.getDataAsString());
+        Logger.log('GAM rows parsed: ' + rows.length + ' from "' + att.getName() + '"');
+        upsertRows(sheet, rows);
+        break;
+      }
+    }
+  }
+}
+
 function refreshData() {
   var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(LW_SHEET_NAME);
   if (!sheet) throw new Error('Sheet "' + LW_SHEET_NAME + '" not found.');
@@ -203,6 +273,7 @@ function refreshData() {
     var rows = fetchDayStats(daysAgo(i), siteNames, adUnitNames);
     upsertRows(sheet, rows);
   }
+  refreshGamData();
 }
 
 function initialLoad() {
@@ -234,8 +305,9 @@ function createDailyTrigger() {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Telsu seuranta')
-    .addItem('Refresh last 3 days', 'refreshData')
-    .addItem('Initial load (7 days)', 'initialLoad')
+    .addItem('Refresh last 3 days (LW + GAM)', 'refreshData')
+    .addItem('Initial load LW (7 days)', 'initialLoad')
+    .addItem('Refresh GAM from Gmail', 'refreshGamData')
     .addSeparator()
     .addItem('Create daily trigger (06:00)', 'createDailyTrigger')
     .addToUi();
@@ -289,6 +361,35 @@ function testRawStatFields() {
     Logger.log('response.netRevenue: ' + JSON.stringify(first.response.netRevenue));
     Logger.log('response.percentageInView: ' + first.response.percentageInView);
     Logger.log('response.views: ' + first.response.views);
+  }
+}
+
+function testRefreshGamData() {
+  Logger.log('Searching Gmail for GAM reports...');
+  refreshGamData();
+  Logger.log('Done.');
+}
+
+function testParseGamCsv() {
+  var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
+  var threads = GmailApp.search(query);
+  Logger.log('Threads found: ' + threads.length);
+  if (threads.length === 0) return;
+  var msg = threads[0].getMessages()[threads[0].getMessages().length - 1];
+  Logger.log('Subject: ' + msg.getSubject());
+  Logger.log('Date: ' + msg.getDate());
+  var attachments = msg.getAttachments();
+  Logger.log('Attachments: ' + attachments.length);
+  for (var i = 0; i < attachments.length; i++) {
+    Logger.log('  ' + attachments[i].getName() + ' (' + attachments[i].getContentType() + ')');
+  }
+  if (attachments.length > 0) {
+    var rows = parseGamCsv(attachments[0].getDataAsString());
+    Logger.log('Parsed rows: ' + rows.length);
+    if (rows.length > 0) {
+      Logger.log('First: ' + JSON.stringify(rows[0]));
+      Logger.log('Last:  ' + JSON.stringify(rows[rows.length - 1]));
+    }
   }
 }
 
