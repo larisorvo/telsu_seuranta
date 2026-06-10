@@ -481,9 +481,6 @@ function refreshCharts() {
   dashSheet.getRange(START + 2, 1, 7, 7).clearContent();
   dashSheet.getRange(START + 2, 1, dates.length, 7).setValues(rows);
 
-  // 4. Hide helper rows 33-41
-  dashSheet.hideRows(START, 9);
-
   // 5. Remove all existing charts on Dashboard
   var existing = dashSheet.getCharts();
   for (var k = 0; k < existing.length; k++) {
