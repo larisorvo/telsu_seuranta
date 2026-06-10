@@ -417,6 +417,131 @@ function getSheetDataByDate(sheet) {
   return result;
 }
 
+function refreshCharts() {
+  var ss         = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var lwSheet    = ss.getSheetByName(LW_SHEET_NAME);
+  var googleSheet = ss.getSheetByName(GAM_SHEET_NAME);
+  var ownGamSheet = ss.getSheetByName(OWN_GAM_SHEET_NAME);
+  var dashSheet  = ss.getSheetByName('Dashboard');
+
+  if (!dashSheet || !lwSheet) {
+    Logger.log('refreshCharts: missing Dashboard or LW sheet');
+    return;
+  }
+
+  // 1. Collect last 7 unique dates from LW sheet
+  var lastRow = lwSheet.getLastRow();
+  if (lastRow < 2) { Logger.log('refreshCharts: LW sheet empty'); return; }
+
+  var rawDates = lwSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  var dateSet = {};
+  for (var i = 0; i < rawDates.length; i++) {
+    var d = rawDates[i][0];
+    var ds = (d instanceof Date)
+      ? Utilities.formatDate(d, 'Europe/Helsinki', 'yyyy-MM-dd')
+      : String(d).slice(0, 10);
+    if (ds && ds.match(/^\d{4}-\d{2}-\d{2}$/)) dateSet[ds] = true;
+  }
+  var dates = Object.keys(dateSet).sort().reverse().slice(0, 7).reverse();
+  if (dates.length === 0) { Logger.log('refreshCharts: no valid dates'); return; }
+
+  // 2. Aggregate totals per date from all three sheets
+  var mmData  = getSheetDataByDate(googleSheet);
+  var lwData  = getSheetDataByDate(lwSheet);
+  var ownData = getSheetDataByDate(ownGamSheet);
+
+  // 3. Write helper range rows 33-41
+  var START = 33;
+  dashSheet.getRange(START, 1, 1, 7).setValues([['7-day trend', '', '', '', '', '', '']]);
+  dashSheet.getRange(START + 1, 1, 1, 7).setValues([[
+    'Date', 'Mindmax Rev', 'IM Rev', 'Mindmax Sold', 'IM Sold', 'Mindmax InView%', 'IM InView%'
+  ]]);
+
+  var rows = [];
+  for (var j = 0; j < dates.length; j++) {
+    var dt  = dates[j];
+    var mm  = mmData[dt]  || {rev: 0, sold: 0, view: 0};
+    var lw  = lwData[dt]  || {rev: 0, sold: 0, view: 0};
+    var own = ownData[dt] || {rev: 0, sold: 0, view: 0};
+    var imSold = lw.sold + own.sold;
+    var imView = lw.view + own.view;
+    rows.push([
+      dt,
+      mm.rev,
+      lw.rev + own.rev,
+      mm.sold,
+      imSold,
+      mm.sold > 0 ? mm.view / mm.sold : 0,
+      imSold > 0  ? imView  / imSold  : 0
+    ]);
+  }
+  // Clear full 7-row block first, then write actual data
+  dashSheet.getRange(START + 2, 1, 7, 7).clearContent();
+  dashSheet.getRange(START + 2, 1, dates.length, 7).setValues(rows);
+
+  // 4. Hide helper rows 33-41
+  dashSheet.hideRows(START, 9);
+
+  // 5. Remove all existing charts on Dashboard
+  var existing = dashSheet.getCharts();
+  for (var k = 0; k < existing.length; k++) {
+    dashSheet.removeChart(existing[k]);
+  }
+
+  // 6. Build 3 line charts anchored at row 43
+  var numRows = dates.length + 1;  // header row + data rows
+  var ANCHOR  = 43;
+
+  // Revenue (€) — cols A-C
+  dashSheet.insertChart(
+    dashSheet.newChart()
+      .setChartType(Charts.ChartType.LINE)
+      .addRange(dashSheet.getRange(START + 1, 1, numRows, 3))
+      .setNumHeaders(1)
+      .setOption('title', '7-day Revenue (€)')
+      .setOption('colors', ['#4285f4', '#ea8600'])
+      .setOption('legend', {position: 'bottom'})
+      .setOption('hAxis', {format: 'MM/dd', slantedText: true})
+      .setOption('vAxis', {format: '€#,##0.00'})
+      .setPosition(ANCHOR, 1, 0, 0)
+      .build()
+  );
+
+  // Sold Impressions — date col A + cols D-E
+  dashSheet.insertChart(
+    dashSheet.newChart()
+      .setChartType(Charts.ChartType.LINE)
+      .addRange(dashSheet.getRange(START + 1, 1, numRows, 1))
+      .addRange(dashSheet.getRange(START + 1, 4, numRows, 2))
+      .setNumHeaders(1)
+      .setOption('title', '7-day Sold Impressions')
+      .setOption('colors', ['#4285f4', '#ea8600'])
+      .setOption('legend', {position: 'bottom'})
+      .setOption('hAxis', {format: 'MM/dd', slantedText: true})
+      .setOption('vAxis', {format: '#,##0'})
+      .setPosition(ANCHOR, 7, 0, 0)
+      .build()
+  );
+
+  // In View % — date col A + cols F-G
+  dashSheet.insertChart(
+    dashSheet.newChart()
+      .setChartType(Charts.ChartType.LINE)
+      .addRange(dashSheet.getRange(START + 1, 1, numRows, 1))
+      .addRange(dashSheet.getRange(START + 1, 6, numRows, 2))
+      .setNumHeaders(1)
+      .setOption('title', '7-day In View %')
+      .setOption('colors', ['#4285f4', '#ea8600'])
+      .setOption('legend', {position: 'bottom'})
+      .setOption('hAxis', {format: 'MM/dd', slantedText: true})
+      .setOption('vAxis', {format: '0%'})
+      .setPosition(ANCHOR, 13, 0, 0)
+      .build()
+  );
+
+  Logger.log('refreshCharts: done, %s days plotted', dates.length);
+}
+
 function refreshGamData() {
   var sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(GAM_SHEET_NAME);
   if (!sheet) throw new Error('Sheet "' + GAM_SHEET_NAME + '" not found.');
@@ -795,16 +920,4 @@ function onOpen() {
     .addSeparator()
     .addItem('Create daily trigger (06:00)', 'createDailyTrigger')
     .addToUi();
-}
-
-function testGetSheetDataByDate() {
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var lwSheet = ss.getSheetByName(LW_SHEET_NAME);
-  var data = getSheetDataByDate(lwSheet);
-  var dates = Object.keys(data).sort();
-  Logger.log('Dates in LW: %s', dates.length);
-  if (dates.length > 0) {
-    var latest = dates[dates.length - 1];
-    Logger.log('Latest date: %s → %s', latest, JSON.stringify(data[latest]));
-  }
 }
