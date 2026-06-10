@@ -428,6 +428,8 @@ function refreshCharts() {
     Logger.log('refreshCharts: missing Dashboard or LW sheet');
     return;
   }
+  if (!googleSheet) Logger.log('refreshCharts: Google sheet missing — Mindmax data will be zero');
+  if (!ownGamSheet) Logger.log('refreshCharts: Own GAM sheet missing — IM GAM data will be zero');
 
   // 1. Collect last 7 unique dates from LW sheet
   var lastRow = lwSheet.getLastRow();
