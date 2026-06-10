@@ -575,6 +575,7 @@ function refreshData() {
   upsertRows(sheet, rows);
   refreshGamData();
   refreshOwnGamData();
+  refreshCharts();
 }
 
 function initialLoad() {
@@ -907,6 +908,7 @@ function setupDashboard() {
   tab.setColumnWidth(17, 85);   // Q
   tab.setColumnWidth(18, 75);   // R: Revenue Diff
 
+  refreshCharts();
   Logger.log('Dashboard tab created successfully.');
 }
 
@@ -919,6 +921,7 @@ function onOpen() {
     .addItem('Refresh Own GAM from Gmail', 'refreshOwnGamData')
     .addSeparator()
     .addItem('Setup Dashboard tab', 'setupDashboard')
+    .addItem('Refresh charts (7-day trend)', 'refreshCharts')
     .addSeparator()
     .addItem('Create daily trigger (06:00)', 'createDailyTrigger')
     .addToUi();
