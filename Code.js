@@ -536,8 +536,8 @@ function refreshCharts() {
   var lwData  = getSheetDataByDate(lwSheet);
   var ownData = getSheetDataByDate(ownGamSheet);
 
-  // 4. Write helper range rows 66-74 (below new Block 3/4 tables)
-  var START = 66;
+  // 4. Write helper range rows 33-41 (below Block 2, rows 21-30)
+  var START = 33;
   dashSheet.showRows(START, 9);
   dashSheet.getRange(START, 1, 1, 7).setValues([['7-day trend', '', '', '', '', '', '']]);
   dashSheet.getRange(START + 1, 1, 1, 7).setValues([[
@@ -576,7 +576,7 @@ function refreshCharts() {
 
   // 6. Build 3 line charts anchored at row 76 (below all data tables)
   var numRows = dates.length + 1;  // header row + data rows
-  var ANCHOR  = 76;
+  var ANCHOR  = 43;
 
   // Revenue (€) — cols A-C
   dashSheet.insertChart(
