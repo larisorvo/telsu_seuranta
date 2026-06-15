@@ -9,6 +9,7 @@ var GAM_REPORT_SENDER = 'admanager-noreply@google.com';
 var GAM_REPORT_SUBJECT = 'Report: im report';
 var OWN_GAM_SHEET_NAME = 'Own GAM';
 var OWN_GAM_REPORT_SUBJECT = 'Report: New Päivämyynti Telsu.fi';
+var AD_REQUEST_REPORT_SUBJECT = 'Report: Telsu Ad request report';
 var HEADERS = [
   'Date', 'Source', 'Publisher', 'Site', 'Placement',
   'Available Impressions', 'Viewable Impressions',
@@ -269,13 +270,11 @@ function parseCsvRow(line) {
   return result;
 }
 
-function parseOwnGamCsv(csvText) {
+function parseOwnGamCsv(csvText, availData) {
   var lines = csvText.split('\n');
   var date = null;
   var publisher = '';
   var dataHeaderIdx = -1;
-  var hasOrderCol = false;
-  var hasAvailCol = false;
 
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].replace('\r', '');
@@ -288,15 +287,24 @@ function parseOwnGamCsv(csvText) {
     }
     if (line.indexOf('Ad unit (all levels),') === 0) {
       dataHeaderIdx = i;
-      // New format: placement, Order, revenue, impressions, inViewPct, eCPM
-      hasOrderCol = line.indexOf(',Order,') !== -1;
-      // Old full format: placement, revenue, avail, sold, fillRate, inViewPct, eCPM
-      hasAvailCol = !hasOrderCol && line.indexOf('Total ad requests') !== -1;
       break;
     }
   }
 
   if (!date || dataHeaderIdx === -1) return [];
+
+  // Dynamic column lookup — tolerates any column order or additions
+  var headerCols = lines[dataHeaderIdx].replace('\r', '').split(',').map(function(h) { return h.trim().replace(/"/g, ''); });
+  function colIdx(name) { var idx = headerCols.indexOf(name); return idx === -1 ? null : idx; }
+  var iPlacement = colIdx('Ad unit (all levels)');
+  var iRevenue   = colIdx('Total revenue');
+  var iSold      = colIdx('Total impressions');
+  var iAvail     = colIdx('Total ad requests');
+  var iInView    = colIdx('Total Active View % viewable impressions');
+  if (iPlacement === null || iRevenue === null) {
+    Logger.log('parseOwnGamCsv: missing required columns in header: %s', headerCols.join('|'));
+    return [];
+  }
 
   var rowMap = {};
   for (var j = dataHeaderIdx + 1; j < lines.length; j++) {
@@ -305,39 +313,25 @@ function parseOwnGamCsv(csvText) {
     var cols = parseCsvRow(dataLine);
     if (cols.length < 2) continue;
 
-    var rawName = cols[0];
-    var revenue, avail, sold, inViewPct, viewable;
-
-    if (hasOrderCol) {
-      // New format: cols[0]=placement, cols[1]=order, cols[2]=revenue,
-      //             cols[3]=impressions, cols[4]=inViewPct, cols[5]=eCPM
-      if (cols.length < 4) continue;
-      revenue  = parseFloat(cols[2]) || 0;
-      avail    = 0;
-      sold     = parseInt(cols[3], 10) || 0;
-      inViewPct = parseFloat(cols[4]) || 0;
-      viewable = Math.round(sold * inViewPct);
-    } else if (hasAvailCol) {
-      // Old full format: placement, revenue, avail, sold, fillRate, inViewPct, eCPM
-      revenue  = parseFloat(cols[1]) || 0;
-      avail    = parseInt(cols[2], 10) || 0;
-      sold     = parseInt(cols[3], 10) || 0;
-      inViewPct = parseFloat(cols[5]) || 0;
-      viewable = Math.round(sold * inViewPct);
-    } else {
-      // Old minimal format: placement, revenue only
-      revenue = parseFloat(cols[1]) || 0;
-      avail = 0; sold = 0; viewable = 0;
-    }
+    var rawName = cols[iPlacement];
+    var revenue   = parseFloat(cols[iRevenue]) || 0;
+    var sold      = iSold   !== null ? (parseInt(cols[iSold], 10)   || 0) : 0;
+    var inViewPct = iInView !== null ? (parseFloat(cols[iInView])   || 0) : 0;
+    var viewable  = Math.round(sold * inViewPct);
 
     // Strip "Telsu.fi » " hierarchy prefix (» = U+00BB)
     var parts = rawName.split('»');
     var rawPlacement = (parts.length > 1) ? parts[parts.length - 1].trim() : rawName;
     var placement = LW_PLACEMENT_MAP[rawPlacement] || rawPlacement;
 
+    // Prefer ad request report for avail; fall back to column in CSV if present
+    var avail = (availData && availData[date] && availData[date][placement])
+      ? availData[date][placement]
+      : (iAvail !== null ? (parseInt(cols[iAvail], 10) || 0) : 0);
+
     var key = date + '|telsu.fi|' + placement;
     if (rowMap[key]) {
-      rowMap[key][5] += avail;
+      rowMap[key][5] = Math.max(rowMap[key][5], avail);  // avail is per placement, not additive
       rowMap[key][6] += viewable;
       rowMap[key][7] += sold;
       rowMap[key][8] += revenue;
@@ -356,10 +350,72 @@ function parseOwnGamCsv(csvText) {
   return rows;
 }
 
+function parseAdRequestCsv(csvText) {
+  var lines = csvText.split('\n');
+  var date = null;
+  var dataHeaderIdx = -1;
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].replace('\r', '');
+    if (line.indexOf('Date range,') === 0) {
+      var dateStr = line.slice('Date range,'.length).replace(/"/g, '').trim();
+      date = Utilities.formatDate(new Date(dateStr), 'Europe/Helsinki', 'yyyy-MM-dd');
+    }
+    if (line.indexOf('Ad unit (all levels),') === 0) {
+      dataHeaderIdx = i;
+      break;
+    }
+  }
+
+  if (!date || dataHeaderIdx === -1) return null;
+
+  var placements = {};
+  for (var j = dataHeaderIdx + 1; j < lines.length; j++) {
+    var dataLine = lines[j].replace('\r', '').trim();
+    if (!dataLine) continue;
+    var cols = parseCsvRow(dataLine);
+    if (cols.length < 2) continue;
+
+    var rawName = cols[0];
+    // Handle both correct UTF-8 (») and mis-encoded (Â») variants
+    var sep = rawName.indexOf('»') !== -1 ? '»' : 'Â»';
+    var parts = rawName.split(sep);
+    var rawPlacement = (parts.length > 1) ? parts[parts.length - 1].trim() : rawName;
+    var placement = LW_PLACEMENT_MAP[rawPlacement] || rawPlacement;
+    placements[placement] = (placements[placement] || 0) + (parseInt(cols[1], 10) || 0);
+  }
+
+  return {date: date, placements: placements};
+}
+
+function readAdRequestData() {
+  // Returns {date: {normalizedPlacement: adRequests}} for last 7 days
+  var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + AD_REQUEST_REPORT_SUBJECT + '" has:attachment newer_than:7d';
+  var threads = GmailApp.search(query);
+  var result = {};
+
+  for (var i = 0; i < threads.length; i++) {
+    var messages = threads[i].getMessages();
+    var msg = messages[messages.length - 1];
+    var attachments = msg.getAttachments();
+    for (var j = 0; j < attachments.length; j++) {
+      var att = attachments[j];
+      if (att.getName().toLowerCase().indexOf('.csv') !== -1) {
+        var parsed = parseAdRequestCsv(att.getDataAsString());
+        if (parsed && parsed.date) result[parsed.date] = parsed.placements;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 function refreshOwnGamData() {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   var sheet = ss.getSheetByName(OWN_GAM_SHEET_NAME);
   if (!sheet) sheet = ss.insertSheet(OWN_GAM_SHEET_NAME);
+
+  var availData = readAdRequestData();  // {date: {placement: adRequests}}
 
   var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + OWN_GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
   var threads = GmailApp.search(query);
@@ -371,7 +427,7 @@ function refreshOwnGamData() {
     for (var j = 0; j < attachments.length; j++) {
       var att = attachments[j];
       if (att.getName().toLowerCase().indexOf('.csv') !== -1) {
-        var rows = parseOwnGamCsv(att.getDataAsString());
+        var rows = parseOwnGamCsv(att.getDataAsString(), availData);
         upsertRows(sheet, rows);
         break;
       }
@@ -480,8 +536,8 @@ function refreshCharts() {
   var lwData  = getSheetDataByDate(lwSheet);
   var ownData = getSheetDataByDate(ownGamSheet);
 
-  // 4. Write helper range rows 33-41
-  var START = 33;
+  // 4. Write helper range rows 66-74 (below new Block 3/4 tables)
+  var START = 66;
   dashSheet.showRows(START, 9);
   dashSheet.getRange(START, 1, 1, 7).setValues([['7-day trend', '', '', '', '', '', '']]);
   dashSheet.getRange(START + 1, 1, 1, 7).setValues([[
@@ -518,9 +574,9 @@ function refreshCharts() {
     dashSheet.removeChart(existing[k]);
   }
 
-  // 6. Build 3 line charts anchored at row 43
+  // 6. Build 3 line charts anchored at row 76 (below all data tables)
   var numRows = dates.length + 1;  // header row + data rows
-  var ANCHOR  = 43;
+  var ANCHOR  = 76;
 
   // Revenue (€) — cols A-C
   dashSheet.insertChart(
@@ -805,12 +861,15 @@ function setupDashboard() {
   // T5: I(9)=label, J(10)=MM+, K(11)=MM HB, L(12)=MM GAM, M(13)=IM+, N(14)=IM HB, O(15)=IM GAM, P(16)=Diff
 
   tab.getRange('A21:G21').mergeAcross().setValue('In View %');
-  tab.getRange('I21:P21').mergeAcross().setValue('RPM (€ per 1k avail)');
+  tab.getRange('I21:P21').mergeAcross().setValue('eCPM (€ per 1k sold)');
+  tab.getRange('Q21:X21').mergeAcross().setValue('Weighted Revenue (€)');
 
   tab.getRange('A22').setValue('Placement');
   tab.getRange('B22:G22').setValues([['MM HB+GAM', 'MM HB', 'MM GAM', 'IM HB+GAM', 'IM HB', 'IM GAM']]);
   tab.getRange('I22').setValue('Placement');
   tab.getRange('J22:P22').setValues([['MM HB+GAM', 'MM HB', 'MM GAM', 'IM HB+GAM', 'IM HB', 'IM GAM', 'Diff']]);
+  tab.getRange('Q22').setValue('Placement');
+  tab.getRange('R22:X22').setValues([['MM HB+GAM', 'MM HB', 'MM GAM', 'IM HB+GAM', 'IM HB', 'IM GAM', 'Diff']]);
 
   for (var i2 = 0; i2 < placements.length; i2++) {
     var row2 = 23 + i2;
@@ -823,15 +882,24 @@ function setupDashboard() {
     tab.getRange(row2, 5).setFormula('=IFERROR((SUMIFS(LW!G:G,LW!A:A,$B$1,LW!E:E,A'+r2+')+SUMIFS(\'Own GAM\'!G:G,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,A'+r2+'))/(SUMIFS(LW!H:H,LW!A:A,$B$1,LW!E:E,A'+r2+')+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,A'+r2+')),0)');
     tab.getRange(row2, 6).setFormula('=IFERROR(SUMIFS(LW!G:G,LW!A:A,$B$1,LW!E:E,A'+r2+')/SUMIFS(LW!H:H,LW!A:A,$B$1,LW!E:E,A'+r2+'),0)');
     tab.getRange(row2, 7).setFormula('=IFERROR(SUMIFS(\'Own GAM\'!G:G,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,A'+r2+')/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,A'+r2+'),0)');
-    // T5: RPM
+    // T5: eCPM (÷ sold for all — MM already stores sold in F, so F=H there)
     tab.getRange(row2, 9).setValue(placements[i2]);
-    tab.getRange(row2, 10).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!E:E,I'+r2+')/SUMIFS(Google!F:F,Google!A:A,$B$1,Google!E:E,I'+r2+')*1000,0)');
-    tab.getRange(row2, 11).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google HB",Google!E:E,I'+r2+')/SUMIFS(Google!F:F,Google!A:A,$B$1,Google!B:B,"Google HB",Google!E:E,I'+r2+')*1000,0)');
-    tab.getRange(row2, 12).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google GAM",Google!E:E,I'+r2+')/SUMIFS(Google!F:F,Google!A:A,$B$1,Google!B:B,"Google GAM",Google!E:E,I'+r2+')*1000,0)');
-    tab.getRange(row2, 13).setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,I'+r2+')+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+'))*$G$2/(SUMIFS(LW!F:F,LW!A:A,$B$1,LW!E:E,I'+r2+')+SUMIFS(\'Own GAM\'!F:F,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+'))*1000,0)');
-    tab.getRange(row2, 14).setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,I'+r2+')*$G$2/SUMIFS(LW!F:F,LW!A:A,$B$1,LW!E:E,I'+r2+')*1000,0)');
-    tab.getRange(row2, 15).setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+')*$G$2/SUMIFS(\'Own GAM\'!F:F,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+')*1000,0)');
+    tab.getRange(row2, 10).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!E:E,I'+r2+')/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!E:E,I'+r2+')*1000,0)');
+    tab.getRange(row2, 11).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google HB",Google!E:E,I'+r2+')/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google HB",Google!E:E,I'+r2+')*1000,0)');
+    tab.getRange(row2, 12).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google GAM",Google!E:E,I'+r2+')/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google GAM",Google!E:E,I'+r2+')*1000,0)');
+    tab.getRange(row2, 13).setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,I'+r2+')+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+'))/(SUMIFS(LW!H:H,LW!A:A,$B$1,LW!E:E,I'+r2+')+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+'))*1000,0)');
+    tab.getRange(row2, 14).setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,I'+r2+')/SUMIFS(LW!H:H,LW!A:A,$B$1,LW!E:E,I'+r2+')*1000,0)');
+    tab.getRange(row2, 15).setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+')/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+')*1000,0)');
     tab.getRange(row2, 16).setFormula('=J'+r2+'-M'+r2);
+    // T6: Weighted Revenue at cols Q-X (17-24)
+    tab.getRange(row2, 17).setValue(placements[i2]);
+    tab.getRange(row2, 18).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!E:E,Q'+r2+')/$D$2,0)');
+    tab.getRange(row2, 19).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google HB",Google!E:E,Q'+r2+')/$D$2,0)');
+    tab.getRange(row2, 20).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google GAM",Google!E:E,Q'+r2+')/$D$2,0)');
+    tab.getRange(row2, 21).setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,Q'+r2+')+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,Q'+r2+'))*$G$2/$B$2,0)');
+    tab.getRange(row2, 22).setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,Q'+r2+')*$G$2/$B$2,0)');
+    tab.getRange(row2, 23).setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,Q'+r2+')*$G$2/$B$2,0)');
+    tab.getRange(row2, 24).setFormula('=R'+r2+'-U'+r2);
   }
 
   tab.getRange('A30').setValue('TOTAL');
@@ -842,13 +910,21 @@ function setupDashboard() {
   tab.getRange('F30').setFormula('=IFERROR(SUMIFS(LW!G:G,LW!A:A,$B$1)/SUMIFS(LW!H:H,LW!A:A,$B$1),0)');
   tab.getRange('G30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!G:G,\'Own GAM\'!A:A,$B$1)/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1),0)');
   tab.getRange('I30').setValue('TOTAL');
-  tab.getRange('J30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1)/SUMIFS(Google!F:F,Google!A:A,$B$1)*1000,0)');
-  tab.getRange('K30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google HB")/SUMIFS(Google!F:F,Google!A:A,$B$1,Google!B:B,"Google HB")*1000,0)');
-  tab.getRange('L30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google GAM")/SUMIFS(Google!F:F,Google!A:A,$B$1,Google!B:B,"Google GAM")*1000,0)');
-  tab.getRange('M30').setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1))*$G$2/(SUMIFS(LW!F:F,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!F:F,\'Own GAM\'!A:A,$B$1))*1000,0)');
-  tab.getRange('N30').setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1)*$G$2/SUMIFS(LW!F:F,LW!A:A,$B$1)*1000,0)');
-  tab.getRange('O30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1)*$G$2/SUMIFS(\'Own GAM\'!F:F,\'Own GAM\'!A:A,$B$1)*1000,0)');
+  tab.getRange('J30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1)/SUMIFS(Google!H:H,Google!A:A,$B$1)*1000,0)');
+  tab.getRange('K30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google HB")/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google HB")*1000,0)');
+  tab.getRange('L30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google GAM")/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google GAM")*1000,0)');
+  tab.getRange('M30').setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1))/(SUMIFS(LW!H:H,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1))*1000,0)');
+  tab.getRange('N30').setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1)/SUMIFS(LW!H:H,LW!A:A,$B$1)*1000,0)');
+  tab.getRange('O30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1)/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1)*1000,0)');
   tab.getRange('P30').setFormula('=J30-M30');
+  tab.getRange('Q30').setValue('TOTAL');
+  tab.getRange('R30').setFormula('=SUM(R23:R29)');
+  tab.getRange('S30').setFormula('=SUM(S23:S29)');
+  tab.getRange('T30').setFormula('=SUM(T23:T29)');
+  tab.getRange('U30').setFormula('=SUM(U23:U29)');
+  tab.getRange('V30').setFormula('=SUM(V23:V29)');
+  tab.getRange('W30').setFormula('=SUM(W23:W29)');
+  tab.getRange('X30').setFormula('=R30-U30');
 
   // ---- Number formats ----
   tab.getRange('B1').setNumberFormat('yyyy-mm-dd');
@@ -867,6 +943,7 @@ function setupDashboard() {
   tab.getRange('R11:X18').setNumberFormat('€#,##0.00');
   tab.getRange('B23:G30').setNumberFormat('0.0%');
   tab.getRange('J23:P30').setNumberFormat('€#,##0.00');
+  tab.getRange('R23:X30').setNumberFormat('€#,##0.00');
 
   // ---- Conditional formatting ----
   // Revenue Diff (X11:X18): red < -5, green > 5
@@ -912,10 +989,23 @@ function setupDashboard() {
     .whenFormulaSatisfied('=$M23<$J23').setBackground('#fce8e6')
     .setRanges([rpmImRange]).build();
 
+  // Block 2 T6: Weighted Revenue — MM HB+GAM (R) vs IM HB+GAM (U)
+  var wRevMmRange = tab.getRange('R23:R30');
+  var wRevImRange = tab.getRange('U23:U30');
+  var wRevMmGreen = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$R23>$U23').setBackground('#e6f4ea').setRanges([wRevMmRange]).build();
+  var wRevMmRed = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$R23<$U23').setBackground('#fce8e6').setRanges([wRevMmRange]).build();
+  var wRevImGreen = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$U23>$R23').setBackground('#e6f4ea').setRanges([wRevImRange]).build();
+  var wRevImRed = SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$U23<$R23').setBackground('#fce8e6').setRanges([wRevImRange]).build();
+
   tab.setConditionalFormatRules([
     revRedRule, revGreenRule,
     ivMindmaxGreen, ivMindmaxRed, ivImGreen, ivImRed,
-    rpmMindmaxGreen, rpmMindmaxRed, rpmImGreen, rpmImRed
+    rpmMindmaxGreen, rpmMindmaxRed, rpmImGreen, rpmImRed,
+    wRevMmGreen, wRevMmRed, wRevImGreen, wRevImRed
   ]);
 
   // ---- Styling ----
@@ -934,12 +1024,15 @@ function setupDashboard() {
   // Block 2 group headers
   tab.getRange('A21:G21').setBackground('#f3e5f5').setFontWeight('bold').setHorizontalAlignment('center');
   tab.getRange('I21:P21').setBackground('#e0f2f1').setFontWeight('bold').setHorizontalAlignment('center');
+  tab.getRange('Q21:X21').setBackground('#ffe0b2').setFontWeight('bold').setHorizontalAlignment('center');
   // Block 2 sub-headers
   tab.getRange('A22:G22').setBackground('#f1f3f4').setFontWeight('bold').setHorizontalAlignment('center');
   tab.getRange('I22:P22').setBackground('#f1f3f4').setFontWeight('bold').setHorizontalAlignment('center');
+  tab.getRange('Q22:X22').setBackground('#f1f3f4').setFontWeight('bold').setHorizontalAlignment('center');
   // Block 2 totals
   tab.getRange('A30:G30').setBackground('#f1f3f4').setFontWeight('bold');
   tab.getRange('I30:P30').setBackground('#f1f3f4').setFontWeight('bold');
+  tab.getRange('Q30:X30').setBackground('#f1f3f4').setFontWeight('bold');
   // Config row 2
   tab.getRange('A2').setFontWeight('bold').setFontColor('#5f6368').setFontSize(9);
   tab.getRange('C2').setFontWeight('bold').setFontColor('#5f6368').setFontSize(9);
@@ -959,6 +1052,7 @@ function setupDashboard() {
   tab.getRange('Q11:Q17').setFontWeight('bold');
   tab.getRange('A23:A29').setFontWeight('bold');
   tab.getRange('I23:I29').setFontWeight('bold');
+  tab.getRange('Q23:Q29').setFontWeight('bold');
 
   // Column widths
   tab.setColumnWidth(1, 160);   // A: Placement
@@ -985,6 +1079,9 @@ function setupDashboard() {
   tab.setColumnWidth(22, 75);   // V: IM HB
   tab.setColumnWidth(23, 75);   // W: IM GAM
   tab.setColumnWidth(24, 75);   // X: Revenue Diff
+
+  // Clear stale content below active blocks (old Block 3/4 positions)
+  tab.getRange('A31:Z65').clearContent().clearFormat();
 
   refreshCharts();
   Logger.log('Dashboard tab created successfully.');
