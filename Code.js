@@ -887,9 +887,9 @@ function setupDashboard() {
     tab.getRange(row2, 10).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!E:E,I'+r2+')/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!E:E,I'+r2+')*1000,0)');
     tab.getRange(row2, 11).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google HB",Google!E:E,I'+r2+')/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google HB",Google!E:E,I'+r2+')*1000,0)');
     tab.getRange(row2, 12).setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google GAM",Google!E:E,I'+r2+')/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google GAM",Google!E:E,I'+r2+')*1000,0)');
-    tab.getRange(row2, 13).setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,I'+r2+')+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+'))/(SUMIFS(LW!H:H,LW!A:A,$B$1,LW!E:E,I'+r2+')+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+'))*1000,0)');
-    tab.getRange(row2, 14).setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,I'+r2+')/SUMIFS(LW!H:H,LW!A:A,$B$1,LW!E:E,I'+r2+')*1000,0)');
-    tab.getRange(row2, 15).setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+')/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+')*1000,0)');
+    tab.getRange(row2, 13).setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,I'+r2+')+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+'))*$G$2/(SUMIFS(LW!H:H,LW!A:A,$B$1,LW!E:E,I'+r2+')+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+'))*1000,0)');
+    tab.getRange(row2, 14).setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1,LW!E:E,I'+r2+')*$G$2/SUMIFS(LW!H:H,LW!A:A,$B$1,LW!E:E,I'+r2+')*1000,0)');
+    tab.getRange(row2, 15).setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+')*$G$2/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1,\'Own GAM\'!E:E,I'+r2+')*1000,0)');
     tab.getRange(row2, 16).setFormula('=J'+r2+'-M'+r2);
     // T6: Weighted Revenue at cols Q-X (17-24)
     tab.getRange(row2, 17).setValue(placements[i2]);
@@ -913,9 +913,9 @@ function setupDashboard() {
   tab.getRange('J30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1)/SUMIFS(Google!H:H,Google!A:A,$B$1)*1000,0)');
   tab.getRange('K30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google HB")/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google HB")*1000,0)');
   tab.getRange('L30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google GAM")/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google GAM")*1000,0)');
-  tab.getRange('M30').setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1))/(SUMIFS(LW!H:H,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1))*1000,0)');
-  tab.getRange('N30').setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1)/SUMIFS(LW!H:H,LW!A:A,$B$1)*1000,0)');
-  tab.getRange('O30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1)/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1)*1000,0)');
+  tab.getRange('M30').setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1))*$G$2/(SUMIFS(LW!H:H,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1))*1000,0)');
+  tab.getRange('N30').setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1)*$G$2/SUMIFS(LW!H:H,LW!A:A,$B$1)*1000,0)');
+  tab.getRange('O30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1)*$G$2/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1)*1000,0)');
   tab.getRange('P30').setFormula('=J30-M30');
   tab.getRange('Q30').setValue('TOTAL');
   tab.getRange('R30').setFormula('=SUM(R23:R29)');
