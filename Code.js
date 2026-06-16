@@ -1090,7 +1090,7 @@ function setupDashboard() {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Telsu seuranta')
-    .addItem('Refresh yesterday (LW + GAM)', 'refreshData')
+    .addItem('Run full daily refresh (same as 7am trigger)', 'refreshData')
     .addItem('Initial load LW (7 days)', 'initialLoad')
     .addItem('Refresh GAM from Gmail', 'refreshGamData')
     .addItem('Refresh Own GAM from Gmail', 'refreshOwnGamData')
@@ -1098,6 +1098,6 @@ function onOpen() {
     .addItem('Setup Dashboard tab', 'setupDashboard')
     .addItem('Refresh charts (7-day trend)', 'refreshCharts')
     .addSeparator()
-    .addItem('Create daily trigger (06:00)', 'createDailyTrigger')
+    .addItem('Create daily trigger (07:00)', 'createDailyTrigger')
     .addToUi();
 }
