@@ -695,9 +695,9 @@ function createDailyTrigger() {
   ScriptApp.newTrigger('refreshData')
     .timeBased()
     .everyDays(1)
-    .atHour(6)
+    .atHour(7)
     .create();
-  Logger.log('Daily trigger created: refreshData at 06:00 script timezone.');
+  Logger.log('Daily trigger created: refreshData at 07:00 script timezone.');
 }
 
 function setupDashboard() {
