@@ -646,25 +646,19 @@ function refreshGamData() {
 
   var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
   var threads = GmailApp.search(query);
-  Logger.log('refreshGamData: query=%s threads=%s', query, threads.length);
 
   for (var i = 0; i < threads.length; i++) {
     var messages = threads[i].getMessages();
     var msg = messages[messages.length - 1];
-    Logger.log('refreshGamData: thread %s subject="%s" date=%s', i, msg.getSubject(), msg.getDate());
     var attachments = msg.getAttachments();
-    var foundCsv = false;
     for (var j = 0; j < attachments.length; j++) {
       var att = attachments[j];
       if (att.getName().toLowerCase().indexOf('.csv') !== -1) {
-        foundCsv = true;
         var rows = parseGamCsv(att.getDataAsString());
-        Logger.log('refreshGamData: attachment=%s parsed %s rows', att.getName(), rows.length);
         upsertRows(sheet, rows);
         break;
       }
     }
-    if (!foundCsv) Logger.log('refreshGamData: no .csv attachment found, %s attachments present: %s', attachments.length, attachments.map(function(a){return a.getName();}).join(', '));
   }
 }
 
