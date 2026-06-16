@@ -646,19 +646,25 @@ function refreshGamData() {
 
   var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
   var threads = GmailApp.search(query);
+  Logger.log('refreshGamData: query=%s threads=%s', query, threads.length);
 
   for (var i = 0; i < threads.length; i++) {
     var messages = threads[i].getMessages();
     var msg = messages[messages.length - 1];
+    Logger.log('refreshGamData: thread %s subject="%s" date=%s', i, msg.getSubject(), msg.getDate());
     var attachments = msg.getAttachments();
+    var foundCsv = false;
     for (var j = 0; j < attachments.length; j++) {
       var att = attachments[j];
       if (att.getName().toLowerCase().indexOf('.csv') !== -1) {
+        foundCsv = true;
         var rows = parseGamCsv(att.getDataAsString());
+        Logger.log('refreshGamData: attachment=%s parsed %s rows', att.getName(), rows.length);
         upsertRows(sheet, rows);
         break;
       }
     }
+    if (!foundCsv) Logger.log('refreshGamData: no .csv attachment found, %s attachments present: %s', attachments.length, attachments.map(function(a){return a.getName();}).join(', '));
   }
 }
 
@@ -708,6 +714,7 @@ function setupDashboard() {
   var savedImShare = 0.25;
   var savedMmShare = 0.75;
   var savedCorrection = 1.0;
+  var savedDays = 1;
   if (tab && tab.getLastRow() >= 2) {
     var cfv;
     cfv = tab.getRange('B2').getValue();
@@ -716,6 +723,8 @@ function setupDashboard() {
     if (cfv > 0 && cfv <= 1) savedMmShare = cfv;
     cfv = tab.getRange('G2').getValue();
     if (cfv > 0) savedCorrection = cfv;
+    cfv = Number(tab.getRange('E1').getValue());
+    if (cfv === 1 || cfv === 3) savedDays = cfv;
   }
 
   if (!tab) {
@@ -731,10 +740,17 @@ function setupDashboard() {
     'Telsu.fi Cont 2', 'Telsu.fi Dets', 'Telsu.fi Search', 'Telsu.fi Top'
   ];
 
-  // Row 1: date selector
+  // Row 1: date selector + days window
   tab.getRange('A1').setValue('Date');
   tab.getRange('B1').setFormula('=TODAY()-1');
   tab.getRange('C1').setValue('← type any YYYY-MM-DD to compare another day');
+  tab.getRange('D1').setValue('Days');
+  tab.getRange('E1').setValue(savedDays);
+  var daysRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['1', '3'], true)
+    .setAllowInvalid(false)
+    .build();
+  tab.getRange('E1').setDataValidation(daysRule);
 
   // Row 2: config — editable cells, persisted across setups
   tab.getRange('A2').setValue('IM HB+GAM share');
@@ -1046,6 +1062,7 @@ function setupDashboard() {
   tab.getRange('A5').setFontStyle('italic');
   tab.getRange('A1').setFontWeight('bold');
   tab.getRange('B1').setFontWeight('bold').setFontSize(12);
+  tab.getRange('D1').setFontWeight('bold');
   // Placement column bold
   tab.getRange('A11:A17').setFontWeight('bold');
   tab.getRange('I11:I17').setFontWeight('bold');
