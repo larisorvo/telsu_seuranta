@@ -913,19 +913,19 @@ function setupDashboard() {
   }
 
   tab.getRange('A30').setValue('TOTAL');
-  tab.getRange('B30').setFormula('=IFERROR(SUMIFS(Google!G:G,Google!A:A,$B$1)/SUMIFS(Google!H:H,Google!A:A,$B$1),0)');
-  tab.getRange('C30').setFormula('=IFERROR(SUMIFS(Google!G:G,Google!A:A,$B$1,Google!B:B,"Google HB")/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google HB"),0)');
-  tab.getRange('D30').setFormula('=IFERROR(SUMIFS(Google!G:G,Google!A:A,$B$1,Google!B:B,"Google GAM")/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google GAM"),0)');
-  tab.getRange('E30').setFormula('=IFERROR((SUMIFS(LW!G:G,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!G:G,\'Own GAM\'!A:A,$B$1))/(SUMIFS(LW!H:H,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1)),0)');
-  tab.getRange('F30').setFormula('=IFERROR(SUMIFS(LW!G:G,LW!A:A,$B$1)/SUMIFS(LW!H:H,LW!A:A,$B$1),0)');
-  tab.getRange('G30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!G:G,\'Own GAM\'!A:A,$B$1)/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1),0)');
+  tab.getRange('B30').setFormula('=IFERROR(SUMIFS(Google!G:G,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1)/SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1),0)');
+  tab.getRange('C30').setFormula('=IFERROR(SUMIFS(Google!G:G,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google HB")/SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google HB"),0)');
+  tab.getRange('D30').setFormula('=IFERROR(SUMIFS(Google!G:G,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google GAM")/SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google GAM"),0)');
+  tab.getRange('E30').setFormula('=IFERROR((SUMIFS(LW!G:G,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1)+SUMIFS(\'Own GAM\'!G:G,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1))/(SUMIFS(LW!H:H,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1)+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1)),0)');
+  tab.getRange('F30').setFormula('=IFERROR(SUMIFS(LW!G:G,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1)/SUMIFS(LW!H:H,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1),0)');
+  tab.getRange('G30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!G:G,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1)/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1),0)');
   tab.getRange('I30').setValue('TOTAL');
-  tab.getRange('J30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1)/SUMIFS(Google!H:H,Google!A:A,$B$1)*1000,0)');
-  tab.getRange('K30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google HB")/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google HB")*1000,0)');
-  tab.getRange('L30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,$B$1,Google!B:B,"Google GAM")/SUMIFS(Google!H:H,Google!A:A,$B$1,Google!B:B,"Google GAM")*1000,0)');
-  tab.getRange('M30').setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1))*$G$2/(SUMIFS(LW!H:H,LW!A:A,$B$1)+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1))*1000,0)');
-  tab.getRange('N30').setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,$B$1)*$G$2/SUMIFS(LW!H:H,LW!A:A,$B$1)*1000,0)');
-  tab.getRange('O30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,$B$1)*$G$2/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,$B$1)*1000,0)');
+  tab.getRange('J30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1)/SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1)*1000,0)');
+  tab.getRange('K30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google HB")/SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google HB")*1000,0)');
+  tab.getRange('L30').setFormula('=IFERROR(SUMIFS(Google!I:I,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google GAM")/SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google GAM")*1000,0)');
+  tab.getRange('M30').setFormula('=IFERROR((SUMIFS(LW!I:I,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1)+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1))*$G$2/(SUMIFS(LW!H:H,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1)+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1))*1000,0)');
+  tab.getRange('N30').setFormula('=IFERROR(SUMIFS(LW!I:I,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1)*$G$2/SUMIFS(LW!H:H,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1)*1000,0)');
+  tab.getRange('O30').setFormula('=IFERROR(SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1)*$G$2/SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1)*1000,0)');
   tab.getRange('P30').setFormula('=J30-M30');
   tab.getRange('Q30').setValue('TOTAL');
   tab.getRange('R30').setFormula('=SUM(R23:R29)');
