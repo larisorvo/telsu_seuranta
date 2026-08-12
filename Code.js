@@ -810,28 +810,28 @@ function setupDashboard() {
     var r = String(row);
     // T1: Avail
     tab.getRange(row, 1).setValue(placements[i]);
-    tab.getRange(row, 2).setFormula('=SUMIFS(Google!F:F,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!E:E,A'+r+')');
-    tab.getRange(row, 3).setFormula('=SUMIFS(Google!F:F,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google HB",Google!E:E,A'+r+')');
-    tab.getRange(row, 4).setFormula('=SUMIFS(Google!F:F,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google GAM",Google!E:E,A'+r+')');
-    tab.getRange(row, 5).setFormula('=SUMIFS(LW!F:F,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1,LW!E:E,A'+r+')+SUMIFS(\'Own GAM\'!F:F,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1,\'Own GAM\'!E:E,A'+r+')');
-    tab.getRange(row, 6).setFormula('=SUMIFS(LW!F:F,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1,LW!E:E,A'+r+')');
-    tab.getRange(row, 7).setFormula('=SUMIFS(\'Own GAM\'!F:F,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1,\'Own GAM\'!E:E,A'+r+')');
+    tab.getRange(row, 2).setFormula('=SUMIFS(Google!F:F,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!E:E,A'+r+')');
+    tab.getRange(row, 3).setFormula('=SUMIFS(Google!F:F,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!B:B,"Google HB",Google!E:E,A'+r+')');
+    tab.getRange(row, 4).setFormula('=SUMIFS(Google!F:F,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!B:B,"Google GAM",Google!E:E,A'+r+')');
+    tab.getRange(row, 5).setFormula('=SUMIFS(LW!F:F,LW!A:A,">="&$B$1,LW!A:A,"<="&$D$1,LW!E:E,A'+r+')+SUMIFS(\'Own GAM\'!F:F,\'Own GAM\'!A:A,">="&$B$1,\'Own GAM\'!A:A,"<="&$D$1,\'Own GAM\'!E:E,A'+r+')');
+    tab.getRange(row, 6).setFormula('=SUMIFS(LW!F:F,LW!A:A,">="&$B$1,LW!A:A,"<="&$D$1,LW!E:E,A'+r+')');
+    tab.getRange(row, 7).setFormula('=SUMIFS(\'Own GAM\'!F:F,\'Own GAM\'!A:A,">="&$B$1,\'Own GAM\'!A:A,"<="&$D$1,\'Own GAM\'!E:E,A'+r+')');
     // T2: Sold
     tab.getRange(row, 9).setValue(placements[i]);
-    tab.getRange(row, 10).setFormula('=SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!E:E,I'+r+')');
-    tab.getRange(row, 11).setFormula('=SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google HB",Google!E:E,I'+r+')');
-    tab.getRange(row, 12).setFormula('=SUMIFS(Google!H:H,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google GAM",Google!E:E,I'+r+')');
-    tab.getRange(row, 13).setFormula('=SUMIFS(LW!H:H,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1,LW!E:E,I'+r+')+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1,\'Own GAM\'!E:E,I'+r+')');
-    tab.getRange(row, 14).setFormula('=SUMIFS(LW!H:H,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1,LW!E:E,I'+r+')');
-    tab.getRange(row, 15).setFormula('=SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1,\'Own GAM\'!E:E,I'+r+')');
+    tab.getRange(row, 10).setFormula('=SUMIFS(Google!H:H,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!E:E,I'+r+')');
+    tab.getRange(row, 11).setFormula('=SUMIFS(Google!H:H,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!B:B,"Google HB",Google!E:E,I'+r+')');
+    tab.getRange(row, 12).setFormula('=SUMIFS(Google!H:H,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!B:B,"Google GAM",Google!E:E,I'+r+')');
+    tab.getRange(row, 13).setFormula('=SUMIFS(LW!H:H,LW!A:A,">="&$B$1,LW!A:A,"<="&$D$1,LW!E:E,I'+r+')+SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,">="&$B$1,\'Own GAM\'!A:A,"<="&$D$1,\'Own GAM\'!E:E,I'+r+')');
+    tab.getRange(row, 14).setFormula('=SUMIFS(LW!H:H,LW!A:A,">="&$B$1,LW!A:A,"<="&$D$1,LW!E:E,I'+r+')');
+    tab.getRange(row, 15).setFormula('=SUMIFS(\'Own GAM\'!H:H,\'Own GAM\'!A:A,">="&$B$1,\'Own GAM\'!A:A,"<="&$D$1,\'Own GAM\'!E:E,I'+r+')');
     // T3: Revenue
     tab.getRange(row, 17).setValue(placements[i]);
-    tab.getRange(row, 18).setFormula('=SUMIFS(Google!I:I,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!E:E,Q'+r+')');
-    tab.getRange(row, 19).setFormula('=SUMIFS(Google!I:I,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google HB",Google!E:E,Q'+r+')');
-    tab.getRange(row, 20).setFormula('=SUMIFS(Google!I:I,Google!A:A,">="&($B$1-$E$1+1),Google!A:A,"<="&$B$1,Google!B:B,"Google GAM",Google!E:E,Q'+r+')');
-    tab.getRange(row, 21).setFormula('=(SUMIFS(LW!I:I,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1,LW!E:E,Q'+r+')+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1,\'Own GAM\'!E:E,Q'+r+'))*$G$2');
-    tab.getRange(row, 22).setFormula('=SUMIFS(LW!I:I,LW!A:A,">="&($B$1-$E$1+1),LW!A:A,"<="&$B$1,LW!E:E,Q'+r+')*$G$2');
-    tab.getRange(row, 23).setFormula('=SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,">="&($B$1-$E$1+1),\'Own GAM\'!A:A,"<="&$B$1,\'Own GAM\'!E:E,Q'+r+')*$G$2');
+    tab.getRange(row, 18).setFormula('=SUMIFS(Google!I:I,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!E:E,Q'+r+')');
+    tab.getRange(row, 19).setFormula('=SUMIFS(Google!I:I,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!B:B,"Google HB",Google!E:E,Q'+r+')');
+    tab.getRange(row, 20).setFormula('=SUMIFS(Google!I:I,Google!A:A,">="&$B$1,Google!A:A,"<="&$D$1,Google!B:B,"Google GAM",Google!E:E,Q'+r+')');
+    tab.getRange(row, 21).setFormula('=(SUMIFS(LW!I:I,LW!A:A,">="&$B$1,LW!A:A,"<="&$D$1,LW!E:E,Q'+r+')+SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,">="&$B$1,\'Own GAM\'!A:A,"<="&$D$1,\'Own GAM\'!E:E,Q'+r+'))*$G$2');
+    tab.getRange(row, 22).setFormula('=SUMIFS(LW!I:I,LW!A:A,">="&$B$1,LW!A:A,"<="&$D$1,LW!E:E,Q'+r+')*$G$2');
+    tab.getRange(row, 23).setFormula('=SUMIFS(\'Own GAM\'!I:I,\'Own GAM\'!A:A,">="&$B$1,\'Own GAM\'!A:A,"<="&$D$1,\'Own GAM\'!E:E,Q'+r+')*$G$2');
     tab.getRange(row, 24).setFormula('=R'+r+'-U'+r);
   }
 
