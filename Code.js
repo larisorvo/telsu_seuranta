@@ -736,6 +736,7 @@ function setupDashboard() {
   tab.getRange('B1').setFormula('=TODAY()-1');
   tab.getRange('C1').setValue('End');
   tab.getRange('D1').setFormula('=TODAY()-1');
+  tab.getRange('E1').clearDataValidations();
   tab.getRange('E1').setValue('← type any YYYY-MM-DD in Start/End for a custom range');
 
   // Row 2: config — editable cells, persisted across setups
