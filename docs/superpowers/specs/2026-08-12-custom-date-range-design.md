@@ -56,12 +56,14 @@ Sheet!A:A,">="&$B$1,Sheet!A:A,"<="&$D$1
 
 This is a mechanical two-part replacement applied identically everywhere the
 pattern appears in `setupDashboard()`:
-- KPI rows 3–7 (Revenue actual, Revenue weighted, Sold Impr weighted, Avg In
-  View %)
-- Block 1 T1 (Available), T2 (Sold), T3 (Revenue) — per-placement rows and
-  TOTAL row
-- Block 2 T4 (In View %), T5 (eCPM), T6 (Weighted Revenue) — per-placement
-  rows and TOTAL row
+- KPI rows 4–7 (Revenue actual, Revenue weighted, Sold Impr weighted, Avg In
+  View %; row 3 is the header row)
+- Block 1 T1 (Available), T2 (Sold), T3 (Revenue) — per-placement rows only
+  (TOTAL row, row 18, uses `=SUM(...)` over per-row cells and needs no change)
+- Block 2 T4 (In View %), T5 (eCPM) — per-placement rows and TOTAL row (row 30)
+  (these TOTAL cells recompute fresh SUMIFS)
+- Block 2 T6 (Weighted Revenue) — per-placement rows only (TOTAL, row 30,
+  uses `=SUM(...)` and needs no change)
 
 No formula's structure changes beyond widening/relocating the date-criteria
 pair — aggregation logic (sums, divisions by share/cost-factor in row 2)
