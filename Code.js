@@ -708,7 +708,6 @@ function setupDashboard() {
   var savedImShare = 0.25;
   var savedMmShare = 0.75;
   var savedCorrection = 1.0;
-  var savedDays = 1;
   if (tab && tab.getLastRow() >= 2) {
     var cfv;
     cfv = tab.getRange('B2').getValue();
@@ -717,8 +716,6 @@ function setupDashboard() {
     if (cfv > 0 && cfv <= 1) savedMmShare = cfv;
     cfv = tab.getRange('G2').getValue();
     if (cfv > 0) savedCorrection = cfv;
-    cfv = Number(tab.getRange('E1').getValue());
-    if (cfv === 1 || cfv === 3) savedDays = cfv;
   }
 
   if (!tab) {
@@ -734,17 +731,12 @@ function setupDashboard() {
     'Telsu.fi Cont 2', 'Telsu.fi Dets', 'Telsu.fi Search', 'Telsu.fi Top'
   ];
 
-  // Row 1: date selector + days window
-  tab.getRange('A1').setValue('Date');
+  // Row 1: custom date range selector
+  tab.getRange('A1').setValue('Start');
   tab.getRange('B1').setFormula('=TODAY()-1');
-  tab.getRange('C1').setValue('← type any YYYY-MM-DD to compare another day');
-  tab.getRange('D1').setValue('Days');
-  tab.getRange('E1').setValue(savedDays);
-  var daysRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['1', '3'], true)
-    .setAllowInvalid(false)
-    .build();
-  tab.getRange('E1').setDataValidation(daysRule);
+  tab.getRange('C1').setValue('End');
+  tab.getRange('D1').setFormula('=TODAY()-1');
+  tab.getRange('E1').setValue('← type any YYYY-MM-DD in Start/End for a custom range');
 
   // Row 2: config — editable cells, persisted across setups
   tab.getRange('A2').setValue('IM HB+GAM share');
@@ -938,6 +930,7 @@ function setupDashboard() {
 
   // ---- Number formats ----
   tab.getRange('B1').setNumberFormat('yyyy-mm-dd');
+  tab.getRange('D1').setNumberFormat('yyyy-mm-dd');
   tab.getRange('B2').setNumberFormat('0%');
   tab.getRange('D2').setNumberFormat('0%');
   tab.getRange('G2').setNumberFormat('0.00');
@@ -1056,7 +1049,8 @@ function setupDashboard() {
   tab.getRange('A5').setFontStyle('italic');
   tab.getRange('A1').setFontWeight('bold');
   tab.getRange('B1').setFontWeight('bold').setFontSize(12);
-  tab.getRange('D1').setFontWeight('bold');
+  tab.getRange('C1').setFontWeight('bold');
+  tab.getRange('D1').setFontWeight('bold').setFontSize(12);
   // Placement column bold
   tab.getRange('A11:A17').setFontWeight('bold');
   tab.getRange('I11:I17').setFontWeight('bold');
