@@ -391,7 +391,7 @@ function parseAdRequestCsv(csvText) {
 function readAdRequestData() {
   // Returns {date: {normalizedPlacement: adRequests}} for last 7 days
   var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + AD_REQUEST_REPORT_SUBJECT + '" has:attachment newer_than:7d';
-  var threads = GmailApp.search(query);
+  var threads = withRetry(function() { return GmailApp.search(query); });
   var result = {};
 
   for (var i = 0; i < threads.length; i++) {
@@ -418,7 +418,7 @@ function refreshOwnGamData() {
   var availData = readAdRequestData();  // {date: {placement: adRequests}}
 
   var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + OWN_GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
-  var threads = GmailApp.search(query);
+  var threads = withRetry(function() { return GmailApp.search(query); });
 
   for (var i = 0; i < threads.length; i++) {
     var messages = threads[i].getMessages();
@@ -645,7 +645,7 @@ function refreshGamData() {
   removeRowsBySource(sheet, 'Google AdX');
 
   var query = 'from:' + GAM_REPORT_SENDER + ' subject:"' + GAM_REPORT_SUBJECT + '" has:attachment newer_than:7d';
-  var threads = GmailApp.search(query);
+  var threads = withRetry(function() { return GmailApp.search(query); });
 
   for (var i = 0; i < threads.length; i++) {
     var messages = threads[i].getMessages();
@@ -669,8 +669,28 @@ function refreshData() {
   var adUnitNames = lwGetAdUnitNameMap([LW_SITE_ID]);
   var rows = fetchDayStats(daysAgo(1), siteNames, adUnitNames);
   upsertRows(sheet, rows);
+
+  // Gmail's search index can briefly lag behind a just-delivered report email.
+  // If yesterday's date didn't land after the first pass, wait and retry once —
+  // a plain error retry wouldn't help here since GmailApp.search() doesn't throw
+  // when it's simply missing a not-yet-indexed message.
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var yesterday = daysAgo(1);
+
   refreshGamData();
+  if (!(yesterday in getSheetDataByDate(ss.getSheetByName(GAM_SHEET_NAME)))) {
+    Logger.log('refreshData: %s missing from %s sheet after first attempt, retrying in 60s.', yesterday, GAM_SHEET_NAME);
+    Utilities.sleep(60000);
+    refreshGamData();
+  }
+
   refreshOwnGamData();
+  if (!(yesterday in getSheetDataByDate(ss.getSheetByName(OWN_GAM_SHEET_NAME)))) {
+    Logger.log('refreshData: %s missing from %s sheet after first attempt, retrying in 60s.', yesterday, OWN_GAM_SHEET_NAME);
+    Utilities.sleep(60000);
+    refreshOwnGamData();
+  }
+
   refreshCharts();
 }
 
