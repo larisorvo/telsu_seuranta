@@ -495,52 +495,14 @@ function getSheetDataByDate(sheet) {
   return result;
 }
 
-function refreshCharts() {
-  var ss         = SpreadsheetApp.openById(SPREADSHEET_ID);
-  var lwSheet    = ss.getSheetByName(LW_SHEET_NAME);
-  var googleSheet = ss.getSheetByName(GAM_SHEET_NAME);
-  var ownGamSheet = ss.getSheetByName(OWN_GAM_SHEET_NAME);
-  var dashSheet  = ss.getSheetByName('Dashboard');
+function buildTrendChartBlock(dashSheet, days, startRow, allDatesAsc, mmData, lwData, ownData, mmShare, imShare, imCostFactor) {
+  var dates = allDatesAsc.slice(-days);
+  if (dates.length === 0) return;
 
-  if (!dashSheet || !lwSheet) {
-    Logger.log('refreshCharts: missing Dashboard or LW sheet');
-    return;
-  }
-  if (!googleSheet) Logger.log('refreshCharts: Google sheet missing — Mindmax data will be zero');
-  if (!ownGamSheet) Logger.log('refreshCharts: Own GAM sheet missing — IM GAM data will be zero');
-
-  // 1. Collect last 7 unique dates from LW sheet
-  var lastRow = lwSheet.getLastRow();
-  if (lastRow < 2) { Logger.log('refreshCharts: LW sheet empty'); return; }
-
-  var rawDates = lwSheet.getRange(2, 1, lastRow - 1, 1).getValues();
-  var dateSet = {};
-  for (var i = 0; i < rawDates.length; i++) {
-    var d = rawDates[i][0];
-    var ds = (d instanceof Date)
-      ? Utilities.formatDate(d, 'Europe/Helsinki', 'yyyy-MM-dd')
-      : String(d).slice(0, 10);
-    if (ds && ds.match(/^\d{4}-\d{2}-\d{2}$/)) dateSet[ds] = true;
-  }
-  var dates = Object.keys(dateSet).sort().reverse().slice(0, 7).reverse();
-  if (dates.length === 0) { Logger.log('refreshCharts: no valid dates'); return; }
-
-  // 2. Read revenue share/factor from Dashboard row 2 (B2=IM share, D2=Mindmax share, G2=IM cost factor)
-  var shareRow   = dashSheet.getRange(2, 1, 1, 7).getValues()[0];
-  var imShare    = Number(shareRow[1]) || 0.25;   // B2
-  var mmShare    = Number(shareRow[3]) || 0.75;   // D2
-  var imCostFactor = Number(shareRow[6]) || 1;    // G2
-
-  // 3. Aggregate totals per date from all three sheets
-  var mmData  = getSheetDataByDate(googleSheet);
-  var lwData  = getSheetDataByDate(lwSheet);
-  var ownData = getSheetDataByDate(ownGamSheet);
-
-  // 4. Write helper range rows 33-41 (below Block 2, rows 21-30)
-  var START = 33;
-  dashSheet.showRows(START, 9);
-  dashSheet.getRange(START, 1, 1, 7).setValues([['7-day trend', '', '', '', '', '', '']]);
-  dashSheet.getRange(START + 1, 1, 1, 7).setValues([[
+  // 1. Write title/header + data rows
+  dashSheet.showRows(startRow, days + 2);
+  dashSheet.getRange(startRow, 1, 1, 7).setValues([[days + '-day trend', '', '', '', '', '', '']]);
+  dashSheet.getRange(startRow + 1, 1, 1, 7).setValues([[
     'Date', 'Mindmax Rev', 'IM Rev', 'Mindmax Sold', 'IM Sold', 'Mindmax InView%', 'IM InView%'
   ]]);
 
@@ -564,32 +526,26 @@ function refreshCharts() {
       imSold > 0  ? imView  / imSold  : 0
     ]);
   }
-  // Clear full 7-row block first, then write actual data
-  dashSheet.getRange(START + 2, 1, 7, 7).clearContent();
-  dashSheet.getRange(START + 2, 1, dates.length, 7).setValues(rows);
+  // Clear full block first, then write actual data
+  dashSheet.getRange(startRow + 2, 1, days, 7).clearContent();
+  dashSheet.getRange(startRow + 2, 1, dates.length, 7).setValues(rows);
 
-  // 5. Remove all existing charts on Dashboard
-  var existing = dashSheet.getCharts();
-  for (var k = 0; k < existing.length; k++) {
-    dashSheet.removeChart(existing[k]);
-  }
-
-  // 6. Build 3 line charts anchored at row 76 (below all data tables)
+  // 2. Build 3 line charts anchored below the data table
   var numRows = dates.length + 1;  // header row + data rows
-  var ANCHOR  = 43;
+  var anchor  = startRow + days + 3;
 
   // Revenue (€) — cols A-C
   dashSheet.insertChart(
     dashSheet.newChart()
       .setChartType(Charts.ChartType.LINE)
-      .addRange(dashSheet.getRange(START + 1, 1, numRows, 3))
+      .addRange(dashSheet.getRange(startRow + 1, 1, numRows, 3))
       .setNumHeaders(1)
-      .setOption('title', '7-day Revenue (€)')
+      .setOption('title', days + '-day Revenue (€)')
       .setOption('colors', ['#4285f4', '#ea8600'])
       .setOption('legend', {position: 'bottom'})
       .setOption('hAxis', {format: 'MM/dd', slantedText: true})
       .setOption('vAxis', {format: '€#,##0.00'})
-      .setPosition(ANCHOR, 1, 0, 0)
+      .setPosition(anchor, 1, 0, 0)
       .build()
   );
 
@@ -597,15 +553,15 @@ function refreshCharts() {
   dashSheet.insertChart(
     dashSheet.newChart()
       .setChartType(Charts.ChartType.LINE)
-      .addRange(dashSheet.getRange(START + 1, 1, numRows, 1))
-      .addRange(dashSheet.getRange(START + 1, 4, numRows, 2))
+      .addRange(dashSheet.getRange(startRow + 1, 1, numRows, 1))
+      .addRange(dashSheet.getRange(startRow + 1, 4, numRows, 2))
       .setNumHeaders(1)
-      .setOption('title', '7-day Sold Impressions')
+      .setOption('title', days + '-day Sold Impressions')
       .setOption('colors', ['#4285f4', '#ea8600'])
       .setOption('legend', {position: 'bottom'})
       .setOption('hAxis', {format: 'MM/dd', slantedText: true})
       .setOption('vAxis', {format: '#,##0'})
-      .setPosition(ANCHOR, 7, 0, 0)
+      .setPosition(anchor, 7, 0, 0)
       .build()
   );
 
@@ -613,19 +569,73 @@ function refreshCharts() {
   dashSheet.insertChart(
     dashSheet.newChart()
       .setChartType(Charts.ChartType.LINE)
-      .addRange(dashSheet.getRange(START + 1, 1, numRows, 1))
-      .addRange(dashSheet.getRange(START + 1, 6, numRows, 2))
+      .addRange(dashSheet.getRange(startRow + 1, 1, numRows, 1))
+      .addRange(dashSheet.getRange(startRow + 1, 6, numRows, 2))
       .setNumHeaders(1)
-      .setOption('title', '7-day In View %')
+      .setOption('title', days + '-day In View %')
       .setOption('colors', ['#4285f4', '#ea8600'])
       .setOption('legend', {position: 'bottom'})
       .setOption('hAxis', {format: 'MM/dd', slantedText: true})
       .setOption('vAxis', {format: '0%'})
-      .setPosition(ANCHOR, 13, 0, 0)
+      .setPosition(anchor, 13, 0, 0)
       .build()
   );
+}
 
-  Logger.log('refreshCharts: done, %s days plotted', dates.length);
+function refreshCharts() {
+  var ss         = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var lwSheet    = ss.getSheetByName(LW_SHEET_NAME);
+  var googleSheet = ss.getSheetByName(GAM_SHEET_NAME);
+  var ownGamSheet = ss.getSheetByName(OWN_GAM_SHEET_NAME);
+  var dashSheet  = ss.getSheetByName('Dashboard');
+
+  if (!dashSheet || !lwSheet) {
+    Logger.log('refreshCharts: missing Dashboard or LW sheet');
+    return;
+  }
+  if (!googleSheet) Logger.log('refreshCharts: Google sheet missing — Mindmax data will be zero');
+  if (!ownGamSheet) Logger.log('refreshCharts: Own GAM sheet missing — IM GAM data will be zero');
+
+  // 1. Collect all unique dates from LW sheet (oldest first)
+  var lastRow = lwSheet.getLastRow();
+  if (lastRow < 2) { Logger.log('refreshCharts: LW sheet empty'); return; }
+
+  var rawDates = lwSheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  var dateSet = {};
+  for (var i = 0; i < rawDates.length; i++) {
+    var d = rawDates[i][0];
+    var ds = (d instanceof Date)
+      ? Utilities.formatDate(d, 'Europe/Helsinki', 'yyyy-MM-dd')
+      : String(d).slice(0, 10);
+    if (ds && ds.match(/^\d{4}-\d{2}-\d{2}$/)) dateSet[ds] = true;
+  }
+  var allDatesAsc = Object.keys(dateSet).sort();
+  if (allDatesAsc.length === 0) { Logger.log('refreshCharts: no valid dates'); return; }
+
+  // 2. Read revenue share/factor from Dashboard row 2 (B2=IM share, D2=Mindmax share, G2=IM cost factor)
+  var shareRow   = dashSheet.getRange(2, 1, 1, 7).getValues()[0];
+  var imShare    = Number(shareRow[1]) || 0.25;   // B2
+  var mmShare    = Number(shareRow[3]) || 0.75;   // D2
+  var imCostFactor = Number(shareRow[6]) || 1;    // G2
+
+  // 3. Aggregate totals per date from all three sheets
+  var mmData  = getSheetDataByDate(googleSheet);
+  var lwData  = getSheetDataByDate(lwSheet);
+  var ownData = getSheetDataByDate(ownGamSheet);
+
+  // 4. Remove all existing charts on Dashboard before rebuilding either block
+  var existing = dashSheet.getCharts();
+  for (var k = 0; k < existing.length; k++) {
+    dashSheet.removeChart(existing[k]);
+  }
+
+  // 5. Build the 7-day block (rows 33-41, charts at row 43) and the 30-day
+  //    block further down (rows 68-99, charts at row 101) — same per-date
+  //    data, just different windows into it.
+  buildTrendChartBlock(dashSheet, 7, 33, allDatesAsc, mmData, lwData, ownData, mmShare, imShare, imCostFactor);
+  buildTrendChartBlock(dashSheet, 30, 68, allDatesAsc, mmData, lwData, ownData, mmShare, imShare, imCostFactor);
+
+  Logger.log('refreshCharts: done, %s total dates available', allDatesAsc.length);
 }
 
 function removeRowsBySource(sheet, source) {
@@ -1107,8 +1117,10 @@ function setupDashboard() {
   tab.setColumnWidth(23, 75);   // W: IM GAM
   tab.setColumnWidth(24, 75);   // X: Revenue Diff
 
-  // Clear stale content below active blocks (old Block 3/4 positions)
-  tab.getRange('A31:Z65').clearContent().clearFormat();
+  // Clear stale content below active blocks (old Block 3/4 positions).
+  // Covers both trend blocks refreshCharts() builds: 7-day (rows 33-61ish)
+  // and 30-day (rows 68-120ish), with headroom either side.
+  tab.getRange('A31:Z125').clearContent().clearFormat();
 
   refreshCharts();
   Logger.log('Dashboard tab created successfully.');
